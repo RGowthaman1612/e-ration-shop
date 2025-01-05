@@ -11,7 +11,7 @@ public class MongoDBClient {
 	private static MongoClient client;
 	private static MongoDatabase db;
 	private static final String MongoDatabaseName = "E_Ration_Shop";
-	private static final String con = "mongodb+srv://gowthamanrajendran:gowthaman@learning.mxf6eyh.mongodb.net/?retryWrites=true&w=majority&appName=Learning";
+	private static final String con = "mongodb+srv://<MONGODB_CONNECTION>.mongodb.net/?retryWrites=true&w=majority&appName=Learning";
 
 	private MongoDBClient() {
 
