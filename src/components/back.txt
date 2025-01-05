@@ -1,0 +1,208 @@
+import { useState, useEffect, ChangeEvent } from 'react';
+import { Button, Grid, TextField } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import Model from 'react-modal';
+import { styled } from '@mui/material/styles';
+import { blueGrey } from "@mui/material/colors";
+import axios from 'axios';
+import { NavBar } from './NavBar';
+import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import dayjs, { Dayjs } from 'dayjs';
+
+const nextDay = dayjs().add(1, 'day');
+const currentTime = dayjs();
+
+const disableWeekendsAndToday = (date: Dayjs) => {
+    const day = date.day();
+    const today = dayjs();
+    return day === 0 || day === 6 || date.isSame(today, 'day');
+};
+
+const Order = () => {
+    const [orderFormVisible, setOrderFormVisible] = useState(true);
+    const [cardproducts, setcardProducts] = useState<Array<{ [key: string]: number }>>([]);
+    const [orderData, setOrderData] = useState<{ [key: string]: any }>({});
+    const [selectedDate, setSelectedDate] = useState<Dayjs | null>(nextDay);
+    const [selectedTime, setSelectedTime] = useState<Dayjs | null>(currentTime);
+    const [error, setError] = useState<string | null>(null);
+    const navigate = useNavigate();
+
+    const ColorButton = styled(Button)(({ theme }) => ({
+        color: theme.palette.getContrastText(blueGrey[500]),
+        backgroundColor: blueGrey[500],
+        '&:hover': {
+            backgroundColor: blueGrey[700],
+        },
+        fontSize: '1.1rem'
+    }));
+
+    useEffect(() => {
+        const fetchcardProducts = async () => {
+            try {
+                const cardId = localStorage.getItem('cardId');
+                const response = await axios.get(`http://localhost:8080/cardType/product/${cardId}`);
+                setcardProducts(response.data);
+                console.log("cardProducts received:", response.data.product);
+            } catch (error) {
+                console.error("Error fetching cardproducts:", error);
+            }
+        };
+        fetchcardProducts();
+    }, []);
+
+    const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = event.target;
+        setOrderData(prevState => ({
+            ...prevState,
+            [name]: Number(value)
+        }));
+    };
+
+    const validateForm = () => {
+        const isAnyProductFilled = Object.values(orderData).some(value => typeof value === 'number' && value > 0);
+        if (!isAnyProductFilled) {
+            setError("Please fill at least one product.");
+            return false;
+        }
+        if (!selectedDate || !selectedTime) {
+            setError("Please select both date and time.");
+            return false;
+        }
+
+        setError(null);
+        return true;
+    };
+
+    const handleSubmit = async () => {
+        if (!validateForm()) {
+            return;
+        }
+        const formattedDate = dayjs(selectedDate).format('DD/MM/YYYY');
+        const formattedTime = dayjs(selectedTime).format('hh:mm A');
+        const orderDataWithDateTime = {
+            orderData:orderData,
+            date: formattedDate,
+            time: formattedTime,
+        };
+        try {
+            console.log("Response from API:", orderDataWithDateTime);
+            
+            // console.log("Response from API:", orderData);
+            const cardId = localStorage.getItem('cardId');
+            const response = await axios.post(`http://localhost:8080/api/booking/order/${cardId}`, orderDataWithDateTime);
+            console.log("Response from API:", response.data);
+            alert("Order submitted successfully!");
+            navigate('/home');
+        } catch (error) {
+            console.error("Error submitting order:", error);
+            alert("Failed to submit order.");
+        }
+    };
+
+    return (
+        <>
+            <NavBar />
+            <Model isOpen={orderFormVisible} onRequestClose={() => setOrderFormVisible(false)}>
+                <Grid sx={{ position: 'relative' }}>
+                    <Button
+                        onClick={() => setOrderFormVisible(false)}
+                        sx={{
+                            position: 'absolute',
+                            top: -30,
+                            right: -1,
+                            minWidth: 'auto',
+                            padding: '8px',
+                            lineHeight: 1,
+                            fontSize: '3rem',
+                            color: 'black',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        &times;
+                    </Button>
+
+                    <Grid sx={{ textAlign: 'center', m: 2, color: 'slategrey' }}>
+                        <h1>Your Order Form</h1>
+                    </Grid>
+
+                    <Grid
+                        component="form"
+                        sx={{
+                            '& > :not(style)': { m: 2, width: '25ch', margin: '1.5rem' },
+                        }}
+                        noValidate
+                        autoComplete="on"
+                    >
+                        {cardproducts.map((map, index) => (
+                            Object.entries(map).map(([key, max], subIndex) => (
+                                <TextField
+                                    id={`outlined-basic-${index}-${subIndex}`}
+                                    key={`${index}-${subIndex}`}
+                                    label={key}
+                                    name={key}
+                                    variant="outlined"
+                                    type="number"
+                                    InputProps={{
+                                        style: { fontSize: '1.2rem' },
+                                        inputProps: {
+                                            min: 0,
+                                            max: max,
+                                        },
+                                    }}
+                                    InputLabelProps={{
+                                        style: { fontSize: '1.2rem', fontWeight: 'bold' },
+                                    }}
+                                    onChange={handleInputChange}
+                                    required
+                                />
+                            ))
+                        ))}
+                    </Grid>
+
+                    {error && (
+                        <Grid sx={{ textAlign: 'center', color: 'red', m: 2 }}>
+                            <p>{error}</p>
+                        </Grid>
+                    )}
+
+                    <Grid container direction="row" justifyContent="center" alignItems="center">
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DemoContainer components={['DatePicker']}>
+                                <DatePicker
+                                    label="Select Date"
+                                    value={selectedDate}
+                                    onChange={(newValue) => {
+                                        setSelectedDate(newValue);
+                                    }}
+                                    shouldDisableDate={disableWeekendsAndToday}
+                                    disablePast
+                                />
+                                <TimePicker
+                                    label="Select Time"
+                                    value={selectedTime}
+                                    onChange={(newValue) => {
+                                        setSelectedTime(newValue);
+                                    }}
+                                    minTime={currentTime.hour(10).minute(0)}
+                                    maxTime={currentTime.hour(16).minute(0)}
+                                />
+                            </DemoContainer>
+                        </LocalizationProvider>
+                    </Grid>
+
+                    <Grid container direction="column" justifyContent="center" alignItems="center">
+                        <ColorButton variant="contained" onClick={handleSubmit} style={{ margin: '22px' }}>Submit</ColorButton>
+                    </Grid>
+                </Grid>
+            </Model>
+        </>
+    );
+};
+
+export default Order;
